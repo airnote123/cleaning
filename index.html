@@ -161,7 +161,7 @@
                 <h1 class="text-xl font-bold tracking-tight mb-1">ロボット掃除機 性能評価システム</h1>
                 <div class="flex items-center space-x-3 mono text-[10px] text-slate-500">
                     <span id="status" class="text-red-500 font-bold">● OFFLINE</span>
-                    <span>VER: 8.2.0</span>
+                    <span>VER: 8.5.0</span>
                     <span id="secretTrigger" class="cursor-pointer hover:underline">PROJECT: CL-RBT-VAL-01</span>
                 </div>
             </div>
@@ -171,34 +171,48 @@
         <div class="space-y-12">
             <!-- 01: アンケート -->
             <section class="report-card p-8">
-                <h2 class="section-title uppercase tracking-widest">01. 現場評価：清掃状況と生活影響</h2>
+                <h2 class="section-title uppercase tracking-widest">01. 現場評価：導入意識と清掃評価</h2>
                 <form id="surveyForm" class="space-y-6">
+                    <!-- 導入賛否 -->
+                    <div class="pb-6 border-b border-dashed border-slate-200">
+                        <label class="data-label text-blue-800 text-sm">【重要】ロボット掃除機の導入に賛成ですか？</label>
+                        <select id="approval" class="w-full p-2 input-field font-bold" required>
+                            <option value="5">5: 強く賛成する</option>
+                            <option value="4">4: 賛成する</option>
+                            <option value="3" selected>3: 普通</option>
+                            <option value="2">2: 反対である</option>
+                            <option value="1">1: 強く反対する</option>
+                            <option value="0">0: わからない・どちらでもいい</option>
+                        </select>
+                        <p class="text-[10px] text-slate-400 mt-1 italic">※クラスの合意形成に向けた指標となります</p>
+                    </div>
+
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
                         <div>
                             <label class="data-label">清掃状況（仕上がり）</label>
                             <select id="rating" class="w-full p-2 input-field mb-3" required>
-                                <option value="">-- 選択してください --</option>
-                                <option value="5">非常に良好</option>
-                                <option value="4">良好</option>
-                                <option value="3" selected>普通</option>
-                                <option value="2">不満</option>
-                                <option value="1">非常に不満</option>
+                                <option value="5">5: 非常に良好</option>
+                                <option value="4">4: 良好</option>
+                                <option value="3" selected>3: 普通</option>
+                                <option value="2">2: 不満</option>
+                                <option value="1">1: 非常に不満</option>
+                                <option value="0">0: わからない（見ていない）</option>
                             </select>
-                            <label class="data-label">清掃に関するコメント</label>
-                            <textarea id="comment" class="w-full p-2 input-field h-24" placeholder="ゴミの取り残し、特定のエリアの不備など..."></textarea>
+                            <label class="data-label">コメント（清掃）</label>
+                            <textarea id="comment" class="w-full p-2 input-field h-24" placeholder="ゴミの取り残しなど..."></textarea>
                         </div>
                         <div>
                             <label class="data-label">生活・業務への影響（音・邪魔さ）</label>
                             <select id="interference" class="w-full p-2 input-field mb-3" required>
-                                <option value="">-- 選択してください --</option>
-                                <option value="5">非常に良好（気にならない）</option>
-                                <option value="4">良好</option>
-                                <option value="3" selected>普通</option>
-                                <option value="2">不満（うるさい・邪魔）</option>
-                                <option value="1">非常に不満（騒音・動線阻害）</option>
+                                <option value="5">5: 非常に良好（気にならない）</option>
+                                <option value="4">4: 良好</option>
+                                <option value="3" selected>3: 普通</option>
+                                <option value="2">2: 不満（うるさい・邪魔）</option>
+                                <option value="1">1: 非常に不満</option>
+                                <option value="0">0: わからない（稼働中不在など）</option>
                             </select>
-                            <label class="data-label">影響に関するコメント</label>
-                            <textarea id="interference_detail" class="w-full p-2 input-field h-24" placeholder="稼働音への不満、接触トラブルなど..."></textarea>
+                            <label class="data-label">コメント（影響）</label>
+                            <textarea id="interference_detail" class="w-full p-2 input-field h-24" placeholder="具体的な不満点など..."></textarea>
                         </div>
                     </div>
                     <button type="button" onclick="openConfirmModal('survey')" class="btn-submit text-xs tracking-widest uppercase">内容を確認する</button>
@@ -292,39 +306,29 @@
             let html = '';
 
             if (type === 'survey') {
+                const aText = document.getElementById('approval').options[document.getElementById('approval').selectedIndex].text;
                 const rText = document.getElementById('rating').options[document.getElementById('rating').selectedIndex].text;
                 const iText = document.getElementById('interference').options[document.getElementById('interference').selectedIndex].text;
-                const comment = document.getElementById('comment').value || '(入力なし)';
-                const iDetail = document.getElementById('interference_detail').value || '(入力なし)';
+                const comment = document.getElementById('comment').value || '(なし)';
+                const iDetail = document.getElementById('interference_detail').value || '(なし)';
 
                 html = `
-                    <div class="border-b pb-2">
-                        <p class="font-bold text-blue-800 underline">清掃状況: ${rText}</p>
-                        <p class="mt-1 text-slate-600 italic">内容: ${comment}</p>
-                    </div>
-                    <div class="border-b pb-2">
-                        <p class="font-bold text-blue-800 underline">生活影響: ${iText}</p>
-                        <p class="mt-1 text-slate-600 italic">内容: ${iDetail}</p>
-                    </div>
+                    <div class="border-b pb-2"><p class="font-bold text-red-600">導入賛否: ${aText}</p></div>
+                    <div class="border-b pb-2"><p class="font-bold text-blue-800">清掃状況: ${rText}</p><p class="mt-1 text-slate-500 italic">${comment}</p></div>
+                    <div class="border-b pb-2"><p class="font-bold text-blue-800">生活影響: ${iText}</p><p class="mt-1 text-slate-500 italic">${iDetail}</p></div>
                 `;
                 currentPayload = {
-                    rating: parseInt(document.getElementById('rating').value) || null,
+                    approval: parseInt(document.getElementById('approval').value) || 0,
+                    rating: parseInt(document.getElementById('rating').value) || 0,
                     comment: document.getElementById('comment').value || null,
-                    interference: parseInt(document.getElementById('interference').value) || null,
+                    interference: parseInt(document.getElementById('interference').value) || 0,
                     interference_detail: document.getElementById('interference_detail').value || null
                 };
             } else {
                 const dw = document.getElementById('dust_weight').value || '0';
                 const ld = document.getElementById('large_debris').value || '0';
                 const dur = document.getElementById('duration').value || '0';
-                html = `
-                    <p class="font-bold text-yellow-700">物理計測ログ</p>
-                    <ul class="list-disc ml-4 mt-1">
-                        <li>重量: ${dw}g</li>
-                        <li>大きなゴミ: ${ld}個</li>
-                        <li>所要時間: ${dur}分</li>
-                    </ul>
-                `;
+                html = `<p class="font-bold">物理計測: ${dw}g / ${ld}個 / ${dur}分</p>`;
                 currentPayload = {
                     dust_weight: parseFloat(dw) || null,
                     large_debris: parseInt(ld) || null,
@@ -343,10 +347,10 @@
             const { error } = await supabaseClient.from('surveys').insert([currentPayload]);
             closeModal('confirmModal');
             if (!error) {
-                showStatusMessage(currentFormType === 'survey' ? 'surveyMsg' : 'dustMsg', '正常に送信されました');
+                showStatusMessage(currentFormType === 'survey' ? 'surveyMsg' : 'dustMsg', '送信成功');
                 document.getElementById(currentFormType === 'survey' ? 'surveyForm' : 'dustForm').reset();
             } else {
-                showStatusMessage(currentFormType === 'survey' ? 'surveyMsg' : 'dustMsg', '送信エラー: ' + error.message, true);
+                showStatusMessage(currentFormType === 'survey' ? 'surveyMsg' : 'dustMsg', 'エラー', true);
             }
             btn.disabled = false;
         };

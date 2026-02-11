@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ロボット掃除機性能検証：データ収集システム</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&family=Roboto+Mono:wght@500&display=swap');
+        
+        :root {
+            --ui-blue: #2b5797; 
+            --bg-gray: #f4f4f4;
+            --border-gray: #d1d1d1;
+            --secret-gold: #b2944b;
+        }
+
+        body { 
+            background-color: var(--bg-gray); 
+            color: #333; 
+            font-family: 'Noto Sans JP', sans-serif;
+            line-height: 1.6;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .report-card { 
+            background: #fff; 
+            border: 1px solid var(--border-gray);
+            border-radius: 0px; 
+            box-shadow: 2px 2px 0px rgba(0,0,0,0.05);
+        }
+
+        .header-stripe {
+            height: 4px;
+            background-color: var(--ui-blue);
+            margin-bottom: 2rem;
+        }
+
+        .section-title {
+            border-left: 4px solid var(--ui-blue);
+            padding-left: 0.75rem;
+            font-weight: bold;
+            font-size: 0.9rem;
+            margin-bottom: 1.5rem;
+            color: var(--ui-blue);
+        }
+
+        .secret-title {
+            border-left: 4px solid var(--secret-gold);
+            color: var(--secret-gold);
+        }
+
+        .input-field {
+            background-color: #fafafa !important;
+            border: 1px solid var(--border-gray) !important;
+            font-size: 0.85rem !important;
+        }
+
+        .btn-submit {
+            background-color: var(--ui-blue);
+            color: #fff;
+            font-weight: bold;
+            width: 100%;
+            padding: 0.75rem;
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-secret { background-color: var(--secret-gold); }
+
+        .data-label {
+            font-size: 0.7rem;
+            color: #777;
+            margin-bottom: 0.25rem;
+            font-weight: bold;
+            display: block;
+        }
+
+        .approval-label { color: #000; }
+
+        .hidden-section { display: none; }
+
+        .modal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.7);
+            backdrop-filter: blur(2px);
+            z-index: 100;
+            align-items: center;
+            justify-content: center;
+            padding: 10px;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 1rem;
+            max-width: 750px;
+            width: 100%;
+            border: 1px solid #000;
+        }
+
+        .confirm-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.7rem;
+            margin-bottom: 1rem;
+            table-layout: fixed;
+        }
+        .confirm-table th {
+            background: #f0f0f0;
+            padding: 6px;
+            border: 1px solid #ddd;
+            width: 100px;
+            color: #555;
+            text-align: center;
+        }
+        .confirm-table td {
+            padding: 6px;
+            border: 1px solid #ddd;
+            font-weight: bold;
+            vertical-align: top;
+            word-break: break-all;
+        }
+        .val-col { width: 140px; background: #fff; text-align: center; }
+        .reason-col { background: #fafafa; }
+
+        .confirm-val-black { color: #000; }
+
+        .msg-box {
+            padding: 1rem;
+            margin-top: 1rem;
+            font-size: 0.8rem;
+            font-weight: bold;
+            display: none;
+            text-align: center;
+            border: 1px solid transparent;
+        }
+        .msg-success { background-color: #f0fdf4; color: #166534; border-color: #22c55e; }
+        .msg-error { background-color: #fef2f2; color: #991b1b; border-color: #ef4444; font-family: 'Roboto Mono', monospace; }
+    </style>
+</head>
+<body class="p-4 md:p-12">
+
+    <div id="passwordModal" class="modal">
+        <div class="modal-content text-center max-w-xs">
+            <h3 class="text-xs font-bold mb-4 uppercase">Admin Auth</h3>
+            <input type="password" id="adminPass" class="w-full p-2 border mb-4 input-field text-center" placeholder="PASSWORD">
+            <div class="flex space-x-2">
+                <button onclick="checkPassword()" class="flex-1 bg-slate-800 text-white p-2 text-[10px] font-bold">Auth</button>
+                <button onclick="closeModal('passwordModal')" class="flex-1 border p-2 text-[10px] font-bold">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="confirmModal" class="modal">
+        <div class="modal-content">
+            <h3 class="text-[10px] font-bold mb-3 uppercase tracking-tighter text-slate-400 border-b pb-1">送信内容の最終確認</h3>
+            <table class="confirm-table">
+                <thead>
+                    <tr id="tableHeader">
+                        <!-- 動的に変更 -->
+                    </tr>
+                </thead>
+                <tbody id="confirmBody">
+                    <!-- 動的に生成 -->
+                </tbody>
+            </table>
+            <div class="flex space-x-2">
+                <button id="finalSubmitBtn" class="flex-1 bg-blue-700 text-white p-2 text-xs font-bold uppercase">確定して送信</button>
+                <button onclick="closeModal('confirmModal')" class="flex-1 border p-2 text-xs font-bold">修正</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="max-w-3xl mx-auto">
+        <div class="header-stripe"></div>
+        
+        <header class="mb-8 flex justify-between items-start">
+            <div>
+                <h1 class="text-lg font-bold tracking-tight mb-1">ロボット掃除機 性能評価システム</h1>
+                <div class="flex items-center space-x-3 text-[9px] text-slate-500 font-mono">
+                    <span id="status" class="text-blue-600 font-bold">ONLINE</span>
+                    <span>V11.0.1</span>
+                    <span id="secretTrigger" class="cursor-pointer hover:underline">PROJECT: CL-RBT-VAL-01</span>
+                </div>
+            </div>
+            <div id="adminIndicator" class="hidden text-[9px] bg-yellow-100 text-yellow-700 px-2 py-1 font-bold">ADMIN</div>
+        </header>
+
+        <div class="space-y-8">
+            <section class="report-card p-6">
+                <h2 class="section-title uppercase tracking-widest">01. 現場評価アンケート</h2>
+                <form id="surveyForm" class="space-y-6">
+                    <div class="pb-6 border-b border-dashed border-slate-200">
+                        <label class="data-label approval-label">導入賛否</label>
+                        <select id="approval" class="w-full p-2 input-field font-bold text-black">
+                            <option value="5">5: 非常に賛成</option>
+                            <option value="4">4: 賛成</option>
+                            <option value="3" selected>3: 普通</option>
+                            <option value="2">2: 反対</option>
+                            <option value="1">1: 非常に反対</option>
+                        </select>
+                        <label class="data-label mt-3">上記入力内容の理由</label>
+                        <textarea id="approval_reason" class="w-full p-2 input-field h-16" placeholder="理由を入力"></textarea>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label class="data-label">清掃満足度</label>
+                            <select id="rating" class="w-full p-2 input-field font-bold">
+                                <option value="5">5: 非常に良好</option>
+                                <option value="4">4: 良好</option>
+                                <option value="3" selected>3: 普通</option>
+                                <option value="2">2: 不満</option>
+                                <option value="1">1: 非常に不満</option>
+                            </select>
+                            <label class="data-label mt-3">上記入力内容の理由</label>
+                            <textarea id="comment" class="w-full p-2 input-field h-24" placeholder="ゴミの取り残しなど"></textarea>
+                        </div>
+                        <div>
+                            <label class="data-label">業務への影響</label>
+                            <select id="interference" class="w-full p-2 input-field font-bold">
+                                <option value="5">5: 全く邪魔でない</option>
+                                <option value="4">4: ほぼ気にならない</option>
+                                <option value="3" selected>3: 普通</option>
+                                <option value="2">2: やや邪魔</option>
+                                <option value="1">1: 非常に邪魔</option>
+                            </select>
+                            <label class="data-label mt-3">上記入力内容の理由</label>
+                            <textarea id="interference_detail" class="w-full p-2 input-field h-24" placeholder="うるさい・邪魔など"></textarea>
+                        </div>
+                    </div>
+                    <button type="button" onclick="openConfirmModal('survey')" class="btn-submit text-xs uppercase tracking-widest">内容を確認する</button>
+                    <div id="surveyMsg" class="msg-box"></div>
+                </form>
+            </section>
+
+            <section id="secretSection" class="report-card p-6 hidden-section border-2 border-yellow-200 shadow-md">
+                <h2 class="section-title secret-title uppercase tracking-widest">02. 管理者物理ログ</h2>
+                <form id="dustForm" class="space-y-6">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label class="data-label">回収重量 (g)</label>
+                            <input type="number" step="0.01" id="dust_weight" class="w-full p-2 input-field" placeholder="0.00">
+                        </div>
+                        <div>
+                            <label class="data-label">大きなゴミ (個)</label>
+                            <input type="number" id="large_debris" class="w-full p-2 input-field" placeholder="0">
+                        </div>
+                        <div>
+                            <label class="data-label">清掃時間 (秒)</label>
+                            <input type="number" step="0.1" id="duration_sec" class="w-full p-2 input-field font-mono" placeholder="0.0">
+                        </div>
+                    </div>
+                    <button type="button" onclick="openConfirmModal('dust')" class="btn-submit btn-secret text-xs uppercase tracking-widest">物理データを確認</button>
+                    <div id="dustMsg" class="msg-box"></div>
+                </form>
+            </section>
+        </div>
+
+        <script>
+            const SUPABASE_URL = 'https://speopkpxkpmspuxjgyde.supabase.co';
+            const SUPABASE_KEY = 'sb_publishable_ywXntr_4W851vxWRjZ3dPA_uCvLurUu';
+            const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+            const pageLoadTime = Date.now();
+            let clickCount = 0;
+            let isAdmin = false;
+
+            document.getElementById('secretTrigger').onclick = () => {
+                if (++clickCount >= 5) {
+                    document.getElementById('passwordModal').style.display = 'flex';
+                    clickCount = 0;
+                }
+            };
+
+            function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+
+            function checkPassword() {
+                if (document.getElementById('adminPass').value === 'cleaning') {
+                    document.getElementById('secretSection').classList.remove('hidden-section');
+                    document.getElementById('adminIndicator').classList.remove('hidden');
+                    isAdmin = true;
+                    closeModal('passwordModal');
+                }
+            }
+
+            function getBrowserName() {
+                const ua = navigator.userAgent;
+                if (ua.includes("Edg/")) return "Microsoft Edge";
+                if (ua.includes("Chrome/") && ua.includes("Safari/") && !ua.includes("Edg/")) return "Google Chrome";
+                if (ua.includes("Safari/") && !ua.includes("Chrome/")) return "Safari";
+                if (ua.includes("Firefox/")) return "Firefox";
+                return "Unknown Browser";
+            }
+
+            let currentPayload = null;
+            let currentFormType = '';
+
+            function openConfirmModal(type) {
+                currentFormType = type;
+                let html = '';
+                const stayTimeSec = (Date.now() - pageLoadTime) / 1000;
+                
+                const meta = {
+                    stay_time_ms: stayTimeSec,
+                    os_info: navigator.platform,
+                    browser_info: getBrowserName(),
+                    screen_res: `${window.screen.width}x${window.screen.height}`
+                };
+
+                if (type === 'survey') {
+                    const getT = (id) => { const e = document.getElementById(id); return e.options[e.selectedIndex].text; };
+                    const getV = (id) => document.getElementById(id).value || "(未記入)";
+
+                    currentPayload = {
+                        approval: parseInt(document.getElementById('approval').value),
+                        approval_reason: getV('approval_reason'),
+                        rating: parseInt(document.getElementById('rating').value),
+                        comment: getV('comment'),
+                        interference: parseInt(document.getElementById('interference').value),
+                        interference_detail: getV('interference_detail'),
+                        // 一般アンケート送信時は物理ログをnullにする
+                        dust_weight: null,
+                        large_debris: null,
+                        duration: null,
+                        ...meta
+                    };
+
+                    document.getElementById('tableHeader').innerHTML = `<th>項目</th><th class="val-col">評価</th><th class="reason-col">理由</th>`;
+                    html = `
+                        <tr><th>導入賛否</th><td class="val-col confirm-val-black">${getT('approval')}</td><td class="reason-col">${currentPayload.approval_reason}</td></tr>
+                        <tr><th>清掃満足</th><td class="val-col">${getT('rating')}</td><td class="reason-col">${currentPayload.comment}</td></tr>
+                        <tr><th>業務影響</th><td class="val-col">${getT('interference')}</td><td class="reason-col">${currentPayload.interference_detail}</td></tr>
+                    `;
+                } else {
+                    const weight = parseFloat(document.getElementById('dust_weight').value || 0);
+                    const large = parseInt(document.getElementById('large_debris').value || 0);
+                    const duration = parseFloat(document.getElementById('duration_sec').value || 0);
+
+                    // クリーニングスコアを算出するためのADMIN用ペイロード
+                    // commentをSQLの判定条件 [ADMIN_PHYSICAL_LOG] に合わせる
+                    currentPayload = {
+                        dust_weight: weight,
+                        large_debris: large,
+                        duration: duration,
+                        comment: '[ADMIN_PHYSICAL_LOG]', 
+                        ...meta
+                    };
+
+                    document.getElementById('tableHeader').innerHTML = `<th>項目</th><th colspan="2">入力値</th>`;
+                    html = `
+                        <tr><th>回収重量</th><td colspan="2">${weight} g</td></tr>
+                        <tr><th>ゴミ数</th><td colspan="2">${large} 個</td></tr>
+                        <tr><th>清掃時間</th><td colspan="2">${duration} 秒</td></tr>
+                    `;
+                }
+
+                document.getElementById('confirmBody').innerHTML = html;
+                document.getElementById('confirmModal').style.display = 'flex';
+            }
+
+            document.getElementById('finalSubmitBtn').onclick = async () => {
+                const btn = document.getElementById('finalSubmitBtn');
+                btn.disabled = true;
+                btn.innerText = "SENDING...";
+                
+                try {
+                    const { error } = await supabaseClient.from('surveys').insert([currentPayload]);
+                    closeModal('confirmModal');
+                    const msgId = currentFormType === 'survey' ? 'surveyMsg' : 'dustMsg';
+                    const msgEl = document.getElementById(msgId);
+                    
+                    if (!error) {
+                        msgEl.innerText = "✓ データベースに記録されました";
+                        msgEl.className = "msg-box msg-success block";
+                        document.getElementById(currentFormType === 'survey' ? 'surveyForm' : 'dustForm').reset();
+                    } else {
+                        console.error(error);
+                        msgEl.innerText = "DATABASE ERROR";
+                        msgEl.className = "msg-box msg-error block";
+                    }
+                } catch (e) { 
+                    const msgId = currentFormType === 'survey' ? 'surveyMsg' : 'dustMsg';
+                    document.getElementById(msgId).className = "msg-box msg-error block";
+                } finally {
+                    btn.disabled = false;
+                    btn.innerText = "確定して送信";
+                }
+            };
+        </script>
+    </div>
+</body>
+</html>

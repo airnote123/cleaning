@@ -277,6 +277,79 @@
         </div>
 
         <script>
+/* =====================================================
+   Remote Control Layer（既存構造完全維持・解析済み適合版）
+   ===================================================== */
+
+document.addEventListener("DOMContentLoaded", async () => {
+    try {
+        const { data, error } = await supabaseClient
+            .from('app_settings')
+            .select('*')
+            .eq('id', 1)
+            .single();
+
+        if (error || !data) return;
+
+        /* ===== 1. メンテナンスモード ===== */
+        if (data.maintenance_mode === true) {
+
+            // ステータス変更
+            const status = document.getElementById('status');
+            status.innerText = "MAINTENANCE";
+            status.classList.remove("text-blue-600");
+            status.classList.add("text-red-600");
+
+            // フォーム停止（構造破壊しない）
+            document.querySelectorAll("button").forEach(btn => {
+                btn.disabled = true;
+                btn.style.opacity = "0.5";
+            });
+
+            return;
+        }
+
+        /* ===== 2. お知らせ表示 ===== */
+        if (data.announcement && data.announcement.trim() !== "") {
+
+            const notice = document.createElement("div");
+            notice.style.background = "#fff8e1";
+            notice.style.border = "1px solid #e0c97f";
+            notice.style.padding = "10px";
+            notice.style.marginBottom = "20px";
+            notice.style.fontSize = "12px";
+            notice.style.textAlign = "center";
+            notice.style.fontWeight = "bold";
+            notice.innerText = data.announcement;
+
+            const container = document.querySelector(".max-w-3xl");
+            container.insertBefore(notice, container.firstChild);
+        }
+
+        /* ===== 3. アンケート停止 ===== */
+        if (data.survey_enabled === false) {
+            const surveyBtn = document.querySelector('#surveyForm button');
+            if (surveyBtn) {
+                surveyBtn.disabled = true;
+                surveyBtn.innerText = "受付停止中";
+                surveyBtn.style.opacity = "0.5";
+            }
+        }
+
+        /* ===== 4. 管理ログ停止 ===== */
+        if (data.dust_enabled === false) {
+            const dustBtn = document.querySelector('#dustForm button');
+            if (dustBtn) {
+                dustBtn.disabled = true;
+                dustBtn.innerText = "停止中";
+                dustBtn.style.opacity = "0.5";
+            }
+        }
+
+    } catch (e) {
+        console.error("RemoteConfig Error:", e);
+    }
+});
             const SUPABASE_URL = 'https://speopkpxkpmspuxjgyde.supabase.co';
             const SUPABASE_KEY = 'sb_publishable_ywXntr_4W851vxWRjZ3dPA_uCvLurUu';
             const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);

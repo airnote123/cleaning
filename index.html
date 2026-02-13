@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>アンケート管理システム</title>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<style>
+body { font-family: sans-serif; margin: 20px; }
+button { padding: 6px 12px; margin-top: 8px; }
+.hidden { display: none; }
+.notice {
+    padding: 10px;
+    background: #eef6ff;
+    border: 1px solid #99c2ff;
+    font-weight: bold;
+    margin-bottom: 15px;
+}
+</style>
+</head>
+<body>
+
+<h2>アンケートフォーム</h2>
+
+<!-- ★ お知らせ表示エリア（追加） -->
+<div id="announcementBox" class="notice hidden"></div>
+
+<form id="surveyForm">
+    <label>名前：<input type="text" id="name"></label><br>
+    <label>満足度：
+        <select id="rating">
+            <option value="5">5</option>
+            <option value="4">4</option>
+            <option value="3">3</option>
+            <option value="2">2</option>
+            <option value="1">1</option>
+        </select>
+    </label><br>
+    <button type="submit">送信</button>
+</form>
+
+<hr>
+
+<h2>管理ログ入力</h2>
+<form id="dustForm">
+    <label>記録内容：<input type="text" id="dustText"></label><br>
+    <button type="submit">記録</button>
+</form>
+
+<script>
+const SUPABASE_URL = "あなたのURL";
+const SUPABASE_KEY = "あなたのANONキー";
+
+const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// ===================================================
+// 既存：アンケート送信
+// ===================================================
+document.getElementById("surveyForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+
+    const name = document.getElementById("name").value;
+    const rating = document.getElementById("rating").value;
+
+    const { error } = await supabaseClient
+        .from("survey_results")
+        .insert([{ name, rating }]);
+
+    if (error) {
+        alert("送信エラー");
+        console.error(error);
+        return;
+    }
+
+    alert("送信完了");
+    e.target.reset();
+});
+
+// ===================================================
+// 既存：管理ログ送信
+// ===================================================
+document.getElementById("dustForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+
+    const content = document.getElementById("dustText").value;
+
+    const { error } = await supabaseClient
+        .from("dust_logs")
+        .insert([{ content }]);
+
+    if (error) {
+        alert("記録エラー");
+        console.error(error);
+        return;
+    }
+
+    alert("記録完了");
+    e.target.reset();
+});
+
+// ===================================================
+// ★ 新機能：RemoteConfig制御
+// ===================================================
+async function loadAppSettings() {
+    try {
+        const { data, error } = await supabaseClient
+            .from("app_settings")
+            .select("*")
+            .eq("id", 1)
+            .single();
+
+        if (error || !data) {
+            console.error("Settings load error:", error);
+            return;
+        }
+
+        // お知らせ表示
+        if (data.announcement && data.announcement.trim() !== "") {
+            const box = document.getElementById("announcementBox");
+            box.innerText = data.announcement;
+            box.classList.remove("hidden");
+        }
+
+        // アンケート停止
+        if (data.survey_enabled === false) {
+            const btn = document.querySelector("#surveyForm button");
+            btn.disabled = true;
+            btn.innerText = "現在受付停止中";
+            btn.style.opacity = "0.5";
+        }
+
+        // 管理ログ停止
+        if (data.dust_enabled === false) {
+            const btn = document.querySelector("#dustForm button");
+            btn.disabled = true;
+            btn.innerText = "停止中";
+            btn.style.opacity = "0.5";
+        }
+
+        // 全体メンテナンス
+        if (data.maintenance_mode === true) {
+            document.body.innerHTML =
+                "<div style='text-align:center;margin-top:120px;font-size:22px;font-weight:bold;'>現在メンテナンス中です</div>";
+        }
+
+    } catch (e) {
+        console.error(e);
+    }
+}
+
+// 起動時実行
+loadAppSettings();
+
+</script>
+</body>
+</html>

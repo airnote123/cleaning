@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ロボット掃除機性能評価システム（Q3版）</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+/* Q4版と同じCSS */
+</style>
+</head>
+<body class="p-4 md:p-12">
+<div class="max-w-3xl mx-auto">
+  <div class="header-stripe"></div>
+
+  <header class="mb-8">
+    <h1 class="text-lg font-bold tracking-tight mb-1">ロボット掃除機 性能評価システム（Q3版）</h1>
+  </header>
+
+  <!-- お知らせ -->
+  <section class="report-card p-6 mb-6">
+    <h2 class="section-title">お知らせ</h2>
+    <div id="newsBox" class="p-3 bg-yellow-50 border-l-4 border-yellow-400 text-sm">
+      読み込み中...
+    </div>
+  </section>
+
+  <section class="report-card p-6">
+    <h2 class="section-title uppercase tracking-widest">01. 現場評価アンケート</h2>
+    <form id="surveyForm" class="space-y-6">
+
+      <!-- Q1 -->
+      <div class="pb-6 border-b border-dashed border-slate-200">
+        <p class="q-text">Q1. ロボット掃除機の導入に賛成ですか？</p>
+        <label class="data-label approval-label">導入賛否</label>
+        <select id="approval" class="w-full p-2 input-field font-bold text-black">
+          <option value="5">5: 非常に賛成</option>
+          <option value="4">4: 賛成</option>
+          <option value="3" selected>3: 普通</option>
+          <option value="2">2: 反対</option>
+          <option value="1">1: 非常に反対</option>
+        </select>
+        <label class="data-label mt-3">上記入力内容の理由</label>
+        <textarea id="approval_reason" class="w-full p-2 input-field h-16"></textarea>
+      </div>
+
+      <!-- Q2 -->
+      <div class="pb-6 border-b border-dashed border-slate-200">
+        <p class="q-text">Q2. 清掃性能に満足していますか？</p>
+        <label class="data-label">清掃満足度</label>
+        <select id="rating" class="w-full p-2 input-field font-bold">
+          <option value="5">5: 非常に満足</option>
+          <option value="4">4: 満足</option>
+          <option value="3" selected>3: 普通</option>
+          <option value="2">2: 不満</option>
+          <option value="1">1: 非常に不満</option>
+        </select>
+        <label class="data-label mt-3">清掃クオリティへの意見</label>
+        <textarea id="comment" class="w-full p-2 input-field h-24"></textarea>
+      </div>
+
+      <!-- Q3 (Q4統合済み) -->
+      <div class="pb-6">
+        <p class="q-text">Q3. 稼働中の音や動きは業務の妨げになりませんか？<br>
+        掃除当番の負担は軽減され、休み時間は快適になりましたか？</p>
+        <label class="data-label">業務への影響</label>
+        <select id="interference" class="w-full p-2 input-field font-bold">
+          <option value="5">5: 非常に気にならない</option>
+          <option value="4">4: 気にならない</option>
+          <option value="3" selected>3: 普通</option>
+          <option value="2">2: 邪魔</option>
+          <option value="1">1: 非常に邪魔</option>
+        </select>
+        <label class="data-label mt-3">稼働中の音や動きについて</label>
+        <textarea id="interference_detail" class="w-full p-2 input-field h-24"></textarea>
+
+        <label class="data-label mt-3">休み時間の快適度</label>
+        <select id="break_comfort" class="w-full p-2 input-field font-bold">
+          <option value="5">5: 非常に快適になった</option>
+          <option value="4">4: 快適になった</option>
+          <option value="3" selected>3: 変わらない</option>
+          <option value="2">2: 不便になった</option>
+          <option value="1">1: 非常に不便になった</option>
+        </select>
+        <label class="data-label mt-3">上記入力内容の理由</label>
+        <textarea id="break_comfort_reason" class="w-full p-2 input-field h-16"></textarea>
+      </div>
+
+      <button type="button" onclick="openConfirmModal()" class="btn-submit text-xs uppercase tracking-widest">内容を確認する</button>
+      <div id="surveyMsg" class="msg-box"></div>
+
+    </form>
+  </section>
+</div>
+
+<script>
+// Q4版と同じJS
+const SUPABASE_URL = 'https://speopkpxkpmspuxjgyde.supabase.co';
+const SUPABASE_KEY = 'YOUR_KEY';
+const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+let currentPayload = null;
+
+function openConfirmModal() {
+  const getT = id => { const e = document.getElementById(id); return e.options[e.selectedIndex].text; }
+  const getV = id => document.getElementById(id).value || "(未記入)";
+
+  currentPayload = {
+    approval: parseInt(document.getElementById('approval').value),
+    approval_reason: getV('approval_reason'),
+    rating: parseInt(document.getElementById('rating').value),
+    comment: getV('comment'),
+    interference: parseInt(document.getElementById('interference').value),
+    interference_detail: getV('interference_detail'),
+    break_comfort: parseInt(document.getElementById('break_comfort').value),
+    break_comfort_reason: getV('break_comfort_reason')
+  };
+
+  alert("確認OKなら送信処理へ進んでください");
+}
+
+// お知らせ取得
+async function loadNews() {
+  let { data, error } = await supabaseClient
+    .from('news')
+    .select('title,message,created_at')
+    .order('created_at', { ascending: false })
+    .limit(3);
+
+  const box = document.getElementById('newsBox');
+  if(error){ box.innerText="お知らせ取得に失敗しました"; return; }
+  if(data.length===0){ box.innerText="現在お知らせはありません"; return; }
+
+  box.innerHTML = data.map(n => `
+    <div class="mb-2">
+      <strong>${n.title}</strong> 
+      <span class="text-xs text-gray-500">(${new Date(n.created_at).toLocaleDateString()})</span>
+      <p>${n.message}</p>
+    </div>
+  `).join('');
+}
+
+loadNews();
+</script>
+</body>
+</html>
